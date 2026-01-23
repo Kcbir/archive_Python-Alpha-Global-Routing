@@ -2,7 +2,7 @@
 __author__ = 'Roman Solovyev: https://github.com/ZFTurbo'
 
 class RouterConfig:
-    STP_ROUTER = 'c_stp' # 'networkx', 'c_stp', 'scip_jack'
+    STP_ROUTER = 'networkx' # 'networkx', 'c_stp', 'scip_jack'
     SORT_NETS_BY = 'random'  # 'random', 'area', 'min_intersection'
     SKIP_DOUBLE_STAGE = 10 # Skip double stage algorithm if rectangle side is less than this value. You can put it very large to use single stage algorithm for all nets
     MULTIPLY_COST = 5 # We need this because we do rounding of capacity and store all in int16 matrix

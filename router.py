@@ -626,20 +626,22 @@ def init_worker(lock1, matrix1_shape1, layer_dir1, circ_name1):
     layer_dir = layer_dir1
     circ_name = circ_name1
 
-    if os.name == 'nt':
-        exe_path = CURRENT_PATH + 'stp_solver/bin/steiner_tree_problem_solver_win64.exe'
-    else:
-        exe_path = CURRENT_PATH + 'stp_solver/bin/steiner_tree_problem_solver_linux.exe'
-    if not os.path.isfile(exe_path):
-        print('No exe file available: {}'.format(exe_path))
-        exit()
+    # Only initialize C binary if using c_stp solver
+    if RouterConfig.STP_ROUTER == 'c_stp':
+        if os.name == 'nt':
+            exe_path = CURRENT_PATH + 'stp_solver/bin/steiner_tree_problem_solver_win64.exe'
+        else:
+            exe_path = CURRENT_PATH + 'stp_solver/bin/steiner_tree_problem_solver_linux.exe'
+        if not os.path.isfile(exe_path):
+            print('No exe file available: {}'.format(exe_path))
+            exit()
 
-    process_ilya = Popen(
-        [exe_path] + ["--stream"] + ["yes"],
-        stdin=PIPE,
-        stdout=PIPE,
-        stderr=PIPE
-    )
+        process_ilya = Popen(
+            [exe_path] + ["--stream"] + ["yes"],
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=PIPE
+        )
 
 def create_shared_block(matrix, shared_name=RouterConfig.SHARED_MEMORY_NAME):
     """

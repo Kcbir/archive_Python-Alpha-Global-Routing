@@ -1,6 +1,9 @@
 # coding: utf-8
 __author__ = 'Roman Solovyev: https://github.com/ZFTurbo'
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import *
 import cv2
 import argparse
@@ -105,8 +108,21 @@ if __name__ == '__main__':
         max_vals.append(matrix[i].max())
 
     print(matrix.shape, matrix.min(), matrix.max(), matrix.mean())
+    
+    # Initialize VideoWriters for all layers
+    height, width = matrix.shape[1], matrix.shape[2]
+    fourcc = cv2.VideoWriter_fourcc(*'H264')
+    video_writers = []
+    for layer in range(matrix.shape[0]):
+        video_path = args.mp4[:-4] + '_{}.mp4'.format(layer)
+        writer = cv2.VideoWriter(video_path, fourcc, 30, (width, height), True)
+        video_writers.append(writer)
+    
+    print(f"Created {len(video_writers)} video writers")
+    
     total = 0
-    all_frames = []
+    max_vals_array = np.array(max_vals).astype(np.float32)
+    
     for net in tqdm.tqdm(data_out):
         for r in data_out[net]:
             x1, y1, z1, x2, y2, z2 = r
@@ -115,18 +131,28 @@ if __name__ == '__main__':
                     matrix[z1:z1 + 1, y1:y2, x1:x1 + 1] -= 1
                 else:
                     matrix[z1:z1 + 1, y1:y1 + 1, x1:x2] -= 1
+        
         total += 1
         if total % 400 == 0:
-            rs = 255 * matrix / np.expand_dims(np.expand_dims(np.array(max_vals).astype(np.float32), axis=-1), axis=-1)
-            rs = np.stack([rs, rs, rs], axis=-1)
-            rs[..., 0][rs[..., 0] < 0] = 0
-            rs[..., 1][rs[..., 1] < 0] = 0
-            rs[..., 2][rs[..., 2] < 0] = 255
-            all_frames.append(rs.astype(np.uint8))
-
-    all_frames = np.array(all_frames).astype(np.uint8)
-    print(all_frames.shape)
-    for i in range(all_frames.shape[1]):
-        create_video(all_frames[:, i], args.mp4[:-4] + '_{}.mp4'.format(i), 30, 'H264')
+            # Process each layer immediately and write to video
+            for layer in range(matrix.shape[0]):
+                # Create frame for this layer only
+                layer_data = matrix[layer]
+                normalized = 255.0 * layer_data / max_vals_array[layer]
+                
+                # Create RGB frame
+                frame = np.stack([normalized, normalized, normalized], axis=-1)
+                frame[:, :, 0][frame[:, :, 0] < 0] = 0
+                frame[:, :, 1][frame[:, :, 1] < 0] = 0  
+                frame[:, :, 2][frame[:, :, 2] < 0] = 255
+                
+                # Write frame immediately and drop reference
+                video_writers[layer].write(frame.astype(np.uint8))
+                del frame  # Explicit cleanup
+    
+    # Close all video writers
+    for writer in video_writers:
+        writer.release()
+    cv2.destroyAllWindows()
     print('Overall time: {:.2f} sec'.format(time.time() - start_time))
 

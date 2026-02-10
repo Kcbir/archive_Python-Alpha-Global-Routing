@@ -32,7 +32,7 @@
 
 ### Key Components
 
-#### 1. **Rustworkx Graph State** (`rl_simple_state.py`)
+#### 1. **Rustworkx Graph State** 
 - **10x faster** than NetworkX
 - Native Rust implementation
 - Directed graph for routing
@@ -45,7 +45,7 @@
 - Memory: More efficient representation
 - API: Clean and simple
 
-#### 2. **GraphSAGE Policy** (`rl_simple_agent.py`)
+#### 2. **GraphSAGE Policy**
 - **Best GNN for routing** problems
 - Inductive learning (generalizes to new circuits)
 - Aggregates neighbor information

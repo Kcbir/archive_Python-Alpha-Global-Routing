@@ -14,6 +14,8 @@ def evaluate_solution(cap, net, res, verbose=False):
     start_time = time.time()
     if os.name == 'nt':
         exe_path = CURRENT_PATH + 'evaluator/evaluator_win64.exe'
+    elif os.uname().sysname == 'Darwin':
+        exe_path = CURRENT_PATH + 'evaluator/evaluator_macos.exe'
     else:
         exe_path = CURRENT_PATH + 'evaluator/evaluator_linux.exe'
     if not os.path.isfile(exe_path):

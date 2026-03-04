@@ -1,12 +1,8 @@
-networkx
 numpy
-scikit-image
 tqdm
-
-# RL Framework Dependencies (Simple & Fast)
-torch>=1.9.0
 rustworkx>=0.13.0
-matplotlib>=3.3.0
 
-# For GraphSAGE GNN policy
-torch-geometric>=2.0.0
+# Optional: RL infrastructure (rl_simple_state.py, rl_simple_agent.py)
+# torch>=1.9.0
+# torch-geometric>=2.0.0
+# matplotlib>=3.3.0

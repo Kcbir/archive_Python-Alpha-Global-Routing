@@ -2,10 +2,8 @@
 __author__ = 'Roman Solovyev: https://github.com/ZFTurbo'
 
 import tqdm
-import argparse
 import os
 import numpy as np
-import networkx as nx
 import time
 
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__)) + '/'
@@ -114,7 +112,17 @@ def read_net(path, verbose=False):
                 continue
             if line == ')':
                 break
-            r = eval(line)
+            # Parse line: pin_name, capacitance, [(layer, x, y), ...]
+            # Split by comma, but be careful with commas inside brackets
+            parts = line.split(', ', 2)  # Split into at most 3 parts
+            if len(parts) == 3:
+                pin_name = parts[0]
+                capacitance = float(parts[1])
+                coordinates = eval(parts[2])
+                r = (pin_name, capacitance, coordinates)
+            else:
+                # Fallback to original eval for backward compatibility
+                r = eval(line)
             points.append(r)
         if len(points) == 0:
             print('Zero points for {}...'.format(name))
@@ -128,142 +136,4 @@ def read_net(path, verbose=False):
     return res
 
 
-def get_ranges_for_net(net_data, matrix_shape, gap=0):
-    """
-    Finds the coordinates of a rectangle that contains all the terminals for a node.
-    It is necessary to extract the submatrix from the capacity matrix.
-    """
-    max_x = -1000000000
-    min_x = 1000000000
-    max_y = -1000000000
-    min_y = 1000000000
-    for points in net_data:
-        z1, x1, y1 = points[0]
-        if x1 > max_x:
-            max_x = x1
-        if x1 < min_x:
-            min_x = x1
-        if y1 > max_y:
-            max_y = y1
-        if y1 < min_y:
-            min_y = y1
 
-    # Increase the size of rectangle (for more flexibility of algorithm). It can be slower with big GAP.
-    if gap > 0:
-        min_x = max(0, min_x - gap)
-        min_y = max(0, min_y - gap)
-        max_x = min(matrix_shape[2] - 1, max_x + gap)
-        max_y = min(matrix_shape[1] - 1, max_y + gap)
-
-    w = max_x - min_x + 1
-    h = max_y - min_y + 1
-    r = (min_x, min_y, max_x, max_y, w, h)
-    return r
-
-def sort_nets_by_area(data_net, matrix_shape):
-    # Order of process nets
-    data_proc = list(data_net.keys())
-
-    # Sort by size of rectangle (we need to process large nets first)
-    areas = []
-    terminals = []
-    dim_by_net = dict()
-    for net in data_proc:
-        min_x, min_y, max_x, max_y, w, h = get_ranges_for_net(data_net[net], matrix_shape)
-        area = w * h
-        areas.append(area)
-        terminals.append(len(data_net[net]))
-        dim_by_net[net] = (w, h)
-
-    print('Sort nets by area...')
-    areas = np.array(areas)
-    # Nets with all terminals at the same coordinate are processed first
-    areas[areas == 1] = 1000000000
-    data_proc = sorted(zip(data_proc, areas), key=lambda x: x[1], reverse=True)
-    data_proc = [i[0] for i in data_proc]
-    return data_proc
-
-
-def sort_nets_random(data_net, matrix_shape):
-    data_proc = list(data_net.keys())
-
-    # Get data for all nets
-    r = dict()
-    areas = []
-    for net in data_proc:
-        min_x, min_y, max_x, max_y, w, h = get_ranges_for_net(data_net[net], matrix_shape)
-        area = w * h
-        areas.append(area)
-        r[net] = (min_x, min_y, max_x + 1, max_y + 1, area, len(data_net[net]))
-
-    areas = np.array(areas)
-    data_proc = np.array(data_proc)
-
-    # Include single cell nets first
-    small_nets = data_proc[areas == 1]
-    other_nets = data_proc[areas != 1]
-    np.random.shuffle(other_nets)
-    order = list(small_nets) + list(other_nets)
-
-    return order
-
-
-def sort_nets_minimize_intersection(data_net, matrix_shape):
-    start_time = time.time()
-    # Order of process nets
-    data_proc = list(data_net.keys())
-
-    # Get data for all nets
-    r = dict()
-    areas = []
-    for net in data_proc:
-        min_x, min_y, max_x, max_y, w, h = get_ranges_for_net(data_net[net], matrix_shape)
-        area = w * h
-        areas.append(area)
-        r[net] = (min_x, min_y, max_x + 1, max_y + 1, area, len(data_net[net]))
-
-    # Here will be final order of nets
-    order = []
-
-    print('Sort nets to minimize intersection during processing...')
-    areas = np.array(areas)
-    data_proc = np.array(data_proc)
-
-    # Include single cell nets first
-    small_nets = data_proc[areas == 1]
-    order += list(small_nets)
-
-    # Exclude single cell nets from further considering
-    data_proc = data_proc[areas != 1]
-    areas = areas[areas != 1]
-
-    # Nets with all terminals at the same coordinate are processed first
-    data_proc = sorted(zip(data_proc, areas), key=lambda x: x[1], reverse=True)
-    data_proc = [i[0] for i in data_proc]
-
-    while 1:
-        current_nets = []
-        m = np.zeros(matrix_shape[1:], dtype=np.bool_)
-        for i in range(len(data_proc)):
-            net = data_proc[i]
-            x1, y1, x2, y2, area, terminals = r[net]
-            if not m[y1:y2, x1:x2].any():
-                current_nets.append(net)
-                m[y1:y2, x1:x2] = True
-                if m.sum() > 0.95 * m.shape[0] * m.shape[1]:
-                    print("Break: {}/{} Density: {}".format(i, len(data_proc), m.sum() / (m.shape[0] * m.shape[1])))
-                    break
-        order += current_nets
-        filter_set = set(current_nets)
-        if 0:
-            # Save order
-            data_proc = [x for x in data_proc if x not in filter_set]
-        else:
-            # Unordered
-            data_proc = list(set(data_proc) - filter_set)
-        print(len(current_nets), len(data_proc))
-        if len(data_proc) <= 0:
-            break
-
-    print('Sorting nets time: {:.2f} sec'.format(time.time() - start_time))
-    return order[::-1]

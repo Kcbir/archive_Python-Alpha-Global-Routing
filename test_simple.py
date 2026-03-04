@@ -262,8 +262,8 @@ def test_real_data():
 
     from utils import read_cap, read_net
 
-    cap_file = os.path.join(os.path.dirname(__file__), 'test_data/ariane133_51.cap')
-    net_file = os.path.join(os.path.dirname(__file__), 'test_data/ariane133_51.net')
+    cap_file = os.path.join(os.path.dirname(__file__), 'test_data/ariane.cap')
+    net_file = os.path.join(os.path.dirname(__file__), 'test_data/ariane.net')
 
     if not os.path.exists(cap_file):
         print(f"  Data not found: {cap_file}  (optional)")
@@ -276,23 +276,24 @@ def test_real_data():
     print(f"  Loaded {len(net_data)} nets in {dt_load:.1f}s")
     print(f"  Grid : {cap_data['nLayers']}L x {cap_data['ySize']}y x {cap_data['xSize']}x")
 
-    # Route first 50 nets with RustWorkX
-    import router_simple as rs
-    rs.data_cap = cap_data
-    rs.data_net = net_data
-    rs.matrix = cap_data['cap'].astype(np.float32)
+    # Route first 50 nets with unified router
+    import router as rt
+    matrix = cap_data['cap'].astype(np.float32).copy()
+    metrics = rt.RoutingMetrics()
+    metrics.total_nets = len(net_data)
 
     nets = list(net_data.keys())[:50]
     t0 = time.time()
     total_edges = 0
     for net in nets:
-        s = rs.find_solution_for_net(net)
+        s, cells = rt.find_solution_for_net(net, matrix, cap_data, net_data, metrics)
         total_edges += s.count('\n') - 3   # rough edge count
     dt_route = time.time() - t0
 
     print(f"  Routed {len(nets)} nets in {dt_route:.2f}s "
           f"({dt_route/len(nets)*1000:.1f} ms/net)")
     print(f"  ~{total_edges} edges produced")
+    print(f"  WL={metrics.total_wirelength}, Vias={metrics.total_vias}")
 
     # State from real data
     state = SimpleRoutingState(
@@ -328,8 +329,7 @@ def main():
     print("  - GraphSAGE GNN policy (powerful)")
     print("  - Simple CNN policy (baseline)")
     print("  - Basic RL agent + training")
-    print("  - RustWorkX Steiner-tree router")
-    print("\nReady for Phase 2: SHAP + Knowledge Graphs")
+    print("  - Enhanced router (Steiner + SHAP + R&R)")
 
 
 if __name__ == '__main__':
